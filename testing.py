@@ -1,11 +1,15 @@
 import numpy as np
 from softmax import Softmax
+from sklearn.datasets import load_iris
 
-sm = Softmax()
-X = np.array([[0,0,0,0], [1,1,1,1], [2,2,2,2], [3,3,3,3], [4,4,4,4], [3,3,3,3]])
-y = np.array([0, 1, 2, 3, 4, 3])
-W = np.random.randn(X.shape[1], y.max() + 1)
-b = np.zeros([y.max() + 1])
-reg_strength = 1e-5
-loss, dW = sm.loss(X, y, W, b, reg_strength)
-print dW
+data = load_iris()
+X = data.data
+y = data.target
+reg_strength = 1e-4
+batch_size = 50
+epochs = 1000
+learning_rate = 1e-2
+sm = Softmax(batch_size=batch_size, epochs=epochs, learning_rate=learning_rate, reg_strength=reg_strength)
+sm.train(X, y)
+pred = sm.predict(X)
+print np.mean(np.equal(y, pred))
