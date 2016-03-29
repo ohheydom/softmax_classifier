@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import random
+from operator import itemgetter
 
 class Softmax:
     def __init__(self, batch_size=50, epochs=100, learning_rate=1e-3, reg_strength=1e-5):
@@ -15,11 +16,14 @@ class Softmax:
         n_classes = y.max() + 1
         self.W = np.random.randn(n_features, n_classes) / np.sqrt(n_features/2)
         config = {}
+        config = {'reg_strength': self.reg_strength, 'batch_size': self.batch_size,
+                'learning_rate': self.learning_rate, 'eps': 1e-8, 'decay_rate': 0.99,
+                'momentum': 0.9, 'cache': None, 'beta_1': 0.9, 'beta_2':0.999}
         for epoch in range(self.epochs):
-            #loss = self.sgd(X, y, self.learning_rate, self.batch_size, self.reg_strength)
-            #config, loss = self.sgd_with_momentum(X, y, self.learning_rate, self.batch_size, self.reg_strength, config)
-            config, loss = self.adam(X, y, self.learning_rate, self.batch_size, self.reg_strength, 1e-8, config)
-            #config, loss = self.rms_prop(X, y, self.learning_rate, self.batch_size, self.reg_strength, 0.99, 1e-7, config)
+            #loss = self.sgd(X, y, config)
+            #config, loss = self.sgd_with_momentum(X, y, config)
+            config, loss = self.adam(X, y, config)
+            #config, loss = self.rms_prop(X, y, config)
             print "Epoch: %s, Loss: %s" % (epoch, loss)
 
     def predict(self, X):
@@ -45,52 +49,49 @@ class Softmax:
         dW += reg_strength * W
         return loss, dW
 
-    def sgd(self, X, y, learning_rate, batch_size, reg_strength):
-        random_indices = random.sample(range(X.shape[0]), batch_size)
-        X_batch = X[random_indices]
-        y_batch = y[random_indices]
-        loss, dW = self.loss(X_batch, y_batch, self.W, 0, reg_strength)
+    def sgd(self, X, y, config):
+        items = itemgetter('learning_rate', 'batch_size', 'reg_strength')(config)
+        learning_rate, batch_size, reg_strength = items
+
+        loss, dW = self.sample_and_calculate_gradient(X, y, batch_size, self.W, 0, reg_strength)
+ 
         self.W -= learning_rate * dW
         return loss
 
-    def sgd_with_momentum(self, X, y, learning_rate, batch_size, reg_strength, config=None):
+    def sgd_with_momentum(self, X, y, config):
         v = config.get('velocity', np.zeros(self.W.shape))
-        momentum = config.get('momentum', 0.9)
+        items = itemgetter('learning_rate', 'batch_size', 'reg_strength', 'momentum')(config)
+        learning_rate, batch_size, reg_strength, momentum = items
 
-        random_indices = random.sample(range(X.shape[0]), batch_size)
-        X_batch = X[random_indices]
-        y_batch = y[random_indices]
-        loss, dW = self.loss(X_batch, y_batch, self.W, 0, reg_strength)
+        loss, dW = self.sample_and_calculate_gradient(X, y, batch_size, self.W, 0, reg_strength)
 
         v = momentum*v - learning_rate*dW
-        self.W += v
         config['velocity'] = v
-        config['momentum'] = momentum
+
+        self.W += v
         return config, loss
 
-    def rms_prop(self, X, y, learning_rate, batch_size, reg_strength, decay_rate, eps, cache=None):
-        random_indices = random.sample(range(X.shape[0]), batch_size)
-        X_batch = X[random_indices]
-        y_batch = y[random_indices]
-        loss, dW = self.loss(X_batch, y_batch, self.W, 0, reg_strength)
+    def rms_prop(self, X, y, config):
+        items = itemgetter('learning_rate', 'batch_size', 'reg_strength', 'decay_rate', 'eps', 'cache')(config)
+        learning_rate, batch_size, reg_strength, decay_rate, eps, cache = items
 
-        cache = np.zeros(dW.shape) if len(cache) == 0 else cache
+        loss, dW = self.sample_and_calculate_gradient(X, y, batch_size, self.W, 0, reg_strength)
+
+        cache = np.zeros(dW.shape) if cache == None else cache
         cache = decay_rate * cache + (1-decay_rate) * dW**2
-        self.W -= learning_rate * dW / (np.sqrt(cache) + eps)
-        return cache, loss
+        config['cache'] = cache
 
-    def adam(self, X, y, learning_rate, batch_size, reg_strength, eps, config=None):
-        beta_1 = 0.9
-        beta_2 = 0.999
-        if config == None: config= {}
+        self.W -= learning_rate * dW / (np.sqrt(cache) + eps)
+        return config, loss
+
+    def adam(self, X, y, config):
+        items = itemgetter('learning_rate', 'batch_size', 'reg_strength', 'eps', 'beta_1', 'beta_2')(config)
+        learning_rate, batch_size, reg_strength, eps, beta_1, beta_2 = items
         config.setdefault('t', 0)
         config.setdefault('m', np.zeros(self.W.shape))
         config.setdefault('v', np.zeros(self.W.shape))
 
-        random_indices = random.sample(range(X.shape[0]), batch_size)
-        X_batch = X[random_indices]
-        y_batch = y[random_indices]
-        loss, dW = self.loss(X_batch, y_batch, self.W, 0, reg_strength)
+        loss, dW = self.sample_and_calculate_gradient(X, y, batch_size, self.W, 0, reg_strength)
 
         config['t'] += 1
         config['m'] = beta_1 * config['m'] + (1-beta_1)*dW
@@ -100,3 +101,9 @@ class Softmax:
 
         self.W -= learning_rate*m/(np.sqrt(v) + eps)
         return config, loss
+
+    def sample_and_calculate_gradient(self, X, y, batch_size, w, b, reg_strength):
+        random_indices = random.sample(range(X.shape[0]), batch_size)
+        X_batch = X[random_indices]
+        y_batch = y[random_indices]
+        return self.loss(X_batch, y_batch, w, b, reg_strength)
