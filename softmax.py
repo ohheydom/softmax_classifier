@@ -23,10 +23,6 @@ class Softmax:
         c = globals()['Softmax']
         for epoch in range(self.epochs):
             loss, config = getattr(c, self.weight_update)(self, X, y, config)
-            #loss, config = self.sgd(X, y, config)
-            #config, loss = self.sgd_with_momentum(X, y, config)
-            #config, loss = self.adam(X, y, config)
-            #config, loss = self.rms_prop(X, y, config)
             print "Epoch: %s, Loss: %s" % (epoch, loss)
 
     def predict(self, X):
@@ -45,7 +41,7 @@ class Softmax:
 
         # Cross entropy loss
         loss = -np.log(softmax[np.arange(len(softmax)), y]).sum() / sample_size
-        loss += 0.5*reg_strength * (W*W).sum()
+        loss += 0.5 * reg_strength * (W**2).sum()
 
         softmax[np.arange(len(softmax)), y] -= 1
         dW = X.T.dot(softmax) / sample_size
@@ -97,12 +93,11 @@ class Softmax:
         loss, dW = self.sample_and_calculate_gradient(X, y, batch_size, self.W, 0, reg_strength)
 
         config['t'] += 1
-        config['m'] = beta_1 * config['m'] + (1-beta_1)*dW
-        config['v'] = beta_2 * config['v'] + (1-beta_2)*(dW**2)
+        config['m'] = config['m']*beta_1 + (1-beta_1)*dW
+        config['v'] = config['v']*beta_2 + (1-beta_2)*dW**2
         m = config['m']/(1-beta_1**config['t'])
-        v = config['v']/(1-beta_2**config['t'])
-
-        self.W -= learning_rate*m/(np.sqrt(v) + eps)
+        v = config['v']/(1-beta_2**config['v'])
+        self.W -= learning_rate*m/(np.sqrt(v)+eps)
         return loss, config
 
     def sample_and_calculate_gradient(self, X, y, batch_size, w, b, reg_strength):
