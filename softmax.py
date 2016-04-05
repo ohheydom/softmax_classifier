@@ -96,7 +96,7 @@ class Softmax:
         config['m'] = config['m']*beta_1 + (1-beta_1)*dW
         config['v'] = config['v']*beta_2 + (1-beta_2)*dW**2
         m = config['m']/(1-beta_1**config['t'])
-        v = config['v']/(1-beta_2**config['v'])
+        v = config['v']/(1-beta_2**config['t'])
         self.W -= learning_rate*m/(np.sqrt(v)+eps)
         return loss, config
 
