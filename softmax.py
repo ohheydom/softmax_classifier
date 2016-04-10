@@ -16,10 +16,10 @@ class Softmax:
         n_features = X.shape[1]
         n_classes = y.max() + 1
         self.W = np.random.randn(n_features, n_classes) / np.sqrt(n_features/2)
-        config = {}
         config = {'reg_strength': self.reg_strength, 'batch_size': self.batch_size,
                 'learning_rate': self.learning_rate, 'eps': 1e-8, 'decay_rate': 0.99,
-                'momentum': 0.9, 'cache': None, 'beta_1': 0.9, 'beta_2':0.999}
+                'momentum': 0.9, 'cache': None, 'beta_1': 0.9, 'beta_2':0.999,
+                'velocity': np.zeros(self.W.shape)}
         c = globals()['Softmax']
         for epoch in range(self.epochs):
             loss, config = getattr(c, self.weight_update)(self, X, y, config)
@@ -40,12 +40,12 @@ class Softmax:
         softmax /= softmax.sum(axis=1).reshape([-1, 1])
 
         # Cross entropy loss
-        loss = -np.log(softmax[np.arange(len(softmax)), y]).sum() / sample_size
+        loss = -np.log(softmax[np.arange(len(softmax)), y]).sum() 
         loss += 0.5 * reg_strength * (W**2).sum()
+        loss /= sample_size
 
         softmax[np.arange(len(softmax)), y] -= 1
-        dW = X.T.dot(softmax) / sample_size
-        dW += reg_strength * W
+        dW = (X.T.dot(softmax) + reg_strength * W)/ sample_size
         return loss, dW
 
     def sgd(self, X, y, config):
@@ -58,16 +58,13 @@ class Softmax:
         return loss, config
 
     def sgd_with_momentum(self, X, y, config):
-        v = config.get('velocity', np.zeros(self.W.shape))
         items = itemgetter('learning_rate', 'batch_size', 'reg_strength', 'momentum')(config)
         learning_rate, batch_size, reg_strength, momentum = items
 
         loss, dW = self.sample_and_calculate_gradient(X, y, batch_size, self.W, 0, reg_strength)
 
-        v = momentum*v - learning_rate*dW
-        config['velocity'] = v
-
-        self.W += v
+        config['velocity'] = momentum*config['velocity'] - learning_rate*dW
+        self.W += config['velocity']
         return loss, config
 
     def rms_prop(self, X, y, config):
