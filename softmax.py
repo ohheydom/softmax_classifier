@@ -41,11 +41,11 @@ class Softmax:
 
         # Cross entropy loss
         loss = -np.log(softmax[np.arange(len(softmax)), y]).sum() 
-        loss += 0.5 * reg_strength * (W**2).sum()
         loss /= sample_size
+        loss += 0.5 * reg_strength * (W**2).sum()
 
         softmax[np.arange(len(softmax)), y] -= 1
-        dW = (X.T.dot(softmax) + reg_strength * W)/ sample_size
+        dW = (X.T.dot(softmax) / sample_size) + (reg_strength * W)
         return loss, dW
 
     def sgd(self, X, y, config):
